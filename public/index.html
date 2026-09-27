@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shopify Order Fetcher</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+      color: #222;
+    }
+    h1 { margin-bottom: 8px; }
+    .sub { color: #666; margin-bottom: 25px; }
+    .filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
+    }
+    input, select, button {
+      padding: 11px 13px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    input { min-width: 260px; }
+    button {
+      background: #111;
+      color: white;
+      cursor: pointer;
+      border: none;
+    }
+    button:hover { opacity: .85; }
+    #message { margin: 15px 0; color: #555; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border-bottom: 1px solid #eee;
+      padding: 13px 10px;
+      text-align: left;
+    }
+    th { background: #f7f7f7; }
+    .items {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .error { color: #c00 !important; }
+  </style>
+</head>
+<body>
+  <h1>Shopify Order Fetcher</h1>
+  <div class="sub">Fetch orders without entering an order ID.</div>
+
+  <div class="filters">
+    <input id="email" type="email" placeholder="Customer email (optional)" />
+
+    <select id="status">
+      <option value="all">All payment statuses</option>
+      <option value="paid">Paid</option>
+      <option value="pending">Pending</option>
+      <option value="authorized">Authorized</option>
+      <option value="refunded">Refunded</option>
+      <option value="partially_refunded">Partially refunded</option>
+      <option value="voided">Voided</option>
+      <option value="unpaid">Unpaid</option>
+    </select>
+
+    <input id="limit" type="number" min="1" max="100" value="20" />
+
+    <button onclick="fetchOrders()">Fetch Orders</button>
+  </div>
+
+  <div id="message"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Order</th>
+        <th>Customer</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Fulfillment</th>
+        <th>Created</th>
+        <th>Items</th>
+      </tr>
+    </thead>
+    <tbody id="orders"></tbody>
+  </table>
+
+  <script>
+    async function fetchOrders() {
+      const message = document.getElementById("message");
+      const tbody = document.getElementById("orders");
+
+      message.className = "";
+      message.textContent = "Fetching orders...";
+      tbody.innerHTML = "";
+
+      const params = new URLSearchParams({
+        email: document.getElementById("email").value,
+        status: document.getElementById("status").value,
+        limit: document.getElementById("limit").value
+      });
+
+      try {
+        const response = await fetch(`/api/orders?${params}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Failed to fetch orders");
+        }
+
+        message.textContent = `${data.orders.length} order(s) found.`;
+
+        tbody.innerHTML = data.orders.map(order => `
+          <tr>
+            <td><strong>${escapeHtml(order.orderNumber)}</strong></td>
+            <td>${escapeHtml(order.customerName || order.email || "-")}</td>
+            <td>${escapeHtml(order.currency)} ${escapeHtml(order.total)}</td>
+            <td>${escapeHtml(order.financialStatus || "-")}</td>
+            <td>${escapeHtml(order.fulfillmentStatus || "-")}</td>
+            <td>${new Date(order.createdAt).toLocaleString()}</td>
+            <td>
+              <ul class="items">
+                ${order.items.map(item =>
+                  `<li>${escapeHtml(item.title)} × ${item.quantity}</li>`
+                ).join("")}
+              </ul>
+            </td>
+          </tr>
+        `).join("");
+      } catch (error) {
+        message.className = "error";
+        message.textContent = error.message;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    fetchOrders();
+  </script>
+</body>
+</html>
